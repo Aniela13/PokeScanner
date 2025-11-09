@@ -146,9 +146,15 @@ const ScannerView: React.FC<ScannerViewProps> = ({
                                 
                                 {selectedImage && !isProcessing ? (
                                     <div className="relative">
-                                        <img src={selectedImage} alt="Preview" className="max-h-80 mx-auto rounded-xl shadow-2xl border-4 border-yellow-400" style={{ objectFit:'contain', width: 'auto'}} />
-                                        <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent rounded-xl"></div>
-                                    </div>
+                                        <img 
+                                    src={currentCard.image} 
+                                    alt={currentCard.nombre} 
+                                    // CLASES DE ESTILO CRÍTICAS: Aseguran que la imagen se ajuste y limite su altura
+                                    className="w-full rounded-2xl shadow-2xl border-4 border-yellow-400 h-auto object-contain bg-gray-900" 
+                                    style={{ maxHeight: '450px' }} // Límite de altura para evitar ventana larga
+                                />
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent rounded-2xl"></div>
+                            </div>
                                 ) : (
                                     <div className="py-12">
                                         <div className="bg-gradient-to-br from-blue-500 to-blue-600 w-24 h-24 mx-auto rounded-full flex items-center justify-center mb-4 shadow-xl">

@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { Camera, Upload, Trash2, Package, X, AlertCircle, Zap, Star, Settings, User, LogIn, FolderOpen, Mail, Heart, HelpCircle, Award, Edit } from 'lucide-react';
+import { Camera, Zap, Star, Settings, User, LogIn, FolderOpen, Mail, Heart, HelpCircle, Award, Edit } from 'lucide-react';
 
 // Importación de Componentes Vistas y Modales
 import { ContactModal, DonateModal, RankingHelpModal } from './Modals';
@@ -40,6 +40,41 @@ export interface CardData {
   tcgPrices: { type: string; price: string }[];
   timestamp: string;
   salePrice?: number;
+}
+
+export interface PriceDetails {
+    market?: number;
+    low?: number;
+    // Otros campos que pueda tener el objeto de precio si son necesarios
+}
+
+export interface TCGPlayerPrices {
+    holofoil?: PriceDetails;
+    normal?: PriceDetails;
+    reverseHolofoil?: PriceDetails;
+    // Agregamos [key: string]: PriceDetails | undefined para manejar cualquier otro tipo de precio
+    [key: string]: PriceDetails | undefined; 
+}
+
+// TIPOS EXTENDIDOS PARA MANEJAR LA RESPUESTA ANIDADA DEL SERVIDOR
+interface CardInfo {
+    name?: string;
+    images?: { large?: string; small?: string; };
+    set?: { name?: string; };
+    // Nuevo tipo TCGPlayerPrices para evitar 'any'
+    tcgplayer?: { 
+        prices?: {
+            holofoil?: { market?: number | string };
+            normal?: { market?: number | string };
+            // Agregamos un index signature si hay otras propiedades a nivel superior
+            [key: string]: any; 
+        } 
+    }; 
+    cardmarket?: { prices?: { lowPrice?: number; averageSellPrice?: number; } };
+    expansionf?: string;
+}
+interface FullServerResponse extends ServerResponse {
+    card_info?: CardInfo;
 }
 
 // URL de la API (MEJORA: Usar variable de entorno real en un proyecto Next.js)
@@ -156,7 +191,7 @@ const PokemonCardScanner = () => {
     };
 
     // Funciones del escáner (lógicas que interactúan con el servidor, movidas al componente principal)
-    const processServerResponse = (response: ServerResponse) => {
+    const processServerResponse = (response: FullServerResponse) => {
         try {
             if (response.error) {
                 setError(response.error);
@@ -165,7 +200,7 @@ const PokemonCardScanner = () => {
             }
         // 1. Extraer la información principal anidada (response.card_info)
         // Usamos indexación segura, asumiendo que el JSON completo es la 'response' si no está anidado.
-        const cardInfo = (response as any).card_info || response; 
+        const cardInfo = response.card_info || response as CardInfo; 
 
         // 2. Extraer Nombre, Expansión e Imagen de cardInfo
         const nombre = cardInfo.name || "Nombre no disponible";
