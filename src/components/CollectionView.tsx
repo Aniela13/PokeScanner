@@ -37,10 +37,17 @@ const CollectionView: React.FC<CollectionViewProps> = ({ cards, deleteCard }) =>
 
         return filtered.sort((a, b) => {
             let comparison = 0;
-            const aValue = a[sortKey] as any;
-            const bValue = b[sortKey] as any;
+            const aValue = a[sortKey];
+            const bValue = b[sortKey];
 
-            if (aValue > bValue) {
+            // Manejo de comparación de valores
+            if (aValue === undefined || bValue === undefined) {
+                // Si falta salePrice, lo tratamos como 0 para la comparación
+                const numA = (aValue as number) || 0;
+                const numB = (bValue as number) || 0;
+                if (numA > numB) comparison = 1;
+                else if (numA < numB) comparison = -1;
+            } else if (aValue > bValue) {
                 comparison = 1;
             } else if (aValue < bValue) {
                 comparison = -1;
