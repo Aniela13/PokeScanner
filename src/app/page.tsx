@@ -1,5 +1,6 @@
 "use client";
 
+import Image from 'next/image';
 import React, { useState, useRef, useEffect } from 'react';
 import { Camera, Upload, Trash2, Package, X, AlertCircle, Zap, Star } from 'lucide-react';
 
@@ -7,6 +8,23 @@ import { Camera, Upload, Trash2, Package, X, AlertCircle, Zap, Star } from 'luci
 // PASO 1: EXTENSIÓN DE TIPOS (NECESARIO PARA RESOLVER EL ERROR DE window.storage)
 // Defininimos la interfaz de la API 'storage' que estás utilizando.
 // Reemplaza 'any' por tipos más específicos si conoces la estructura exacta.
+interface TrollPrice {
+  type?: string;
+  name?: string;
+  price?: string;
+}
+
+interface ServerResponse {
+  error?: string;
+  nombre?: string;
+  expansionf?: string; 
+  url?: string;
+  troll?: {
+    Troll?: TrollPrice[];
+    cards?: TrollPrice[]; 
+  };
+  tcg?: Record<string, string | number>; 
+}
 interface CustomStorageApi {
   list: (prefix: string) => Promise<{ keys: string[] } | null>;
   get: (key: string) => Promise<{ value: string } | null>;
@@ -16,11 +34,7 @@ interface CustomStorageApi {
 
 // Extendemos la interfaz global Window para incluir nuestra propiedad 'storage'
 // Esto resuelve el error de compilación.
-declare global {
-  interface Window {
-    storage: CustomStorageApi;
-  }
-}
+
 // ====================================================================
 
 // Definición de tipos para la carta
@@ -63,9 +77,7 @@ const PokemonCardScanner = () => {
 
   useEffect(() => {
     // Aseguramos que 'window.storage' exista antes de intentar usarlo
-    if (typeof window !== 'undefined' && window.storage) {
-        loadCards();
-    }
+    loadCards();
     
     // Función de limpieza para la cámara (stream)
     return () => {
@@ -82,16 +94,22 @@ const PokemonCardScanner = () => {
   const loadCards = async () => {
     // Ya no es necesario 'as any' gracias a la declaración de tipos
     try {
-      const result = await window.storage.list('card:');
-      if (result && result.keys) {
-        const cardPromises = result.keys.map(async (key) => {
-          const data = await window.storage.get(key);
-          // Aseguramos que data.value exista antes de parsear
-          return data && data.value ? JSON.parse(data.value) as CardData : null;
-        });
-        const loadedCards = (await Promise.all(cardPromises)).filter((c): c is CardData => c !== null);
-        setCards(loadedCards);
+      // ⚙️ CAMBIO: Usamos localStorage para cargar las cartas
+      if (typeof window === 'undefined' || !window.localStorage) return;
+      const loadedCards: CardData[] = [];
+      
+      // Itera sobre las claves y filtra por el prefijo 'card:'
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('card:')) {
+          const value = localStorage.getItem(key);
+          if (value) {
+            loadedCards.push(JSON.parse(value) as CardData);
+          }
+        }
       }
+        
+      setCards(loadedCards);
     } catch (err) {
       console.log('No hay cartas guardadas aún o error de storage:', err);
     }
@@ -115,8 +133,8 @@ const PokemonCardScanner = () => {
         salePrice: salePriceValue
       };
 
-      await window.storage.set(`card:${cardToSave.id}`, JSON.stringify(cardToSave));
-      
+      localStorage.setItem(`card:${cardToSave.id}`, JSON.stringify(cardToSave));
+
       setCards(prev => [cardToSave, ...prev]);
       resetScanner();
     } catch (err) {
@@ -127,7 +145,7 @@ const PokemonCardScanner = () => {
 
   const deleteCard = async (cardId: string) => { // Tipado explícito para cardId
     try {
-      await window.storage.delete(`card:${cardId}`);
+      localStorage.removeItem(`card:${cardId}`);
       setCards(prev => prev.filter(c => c.id !== cardId));
     } catch (err) {
       console.error('Error al eliminar:', err);
@@ -251,7 +269,7 @@ const PokemonCardScanner = () => {
     }
   };
 
-  const processServerResponse = (response: any) => { // Usamos 'any' ya que la estructura del servidor es desconocida
+  const processServerResponse = (response: ServerResponse) => { // Usamos 'any' ya que la estructura del servidor es desconocida
     try {
       if (response.error) {
         setError(response.error);
@@ -397,10 +415,13 @@ const PokemonCardScanner = () => {
                 <div className="border-4 border-dashed border-blue-300 rounded-2xl p-8 text-center hover:border-blue-500 transition-all bg-blue-50">
                   {selectedImage && !isProcessing ? (
                     <div className="relative">
-                      <img 
+                      <Image 
                         src={selectedImage} 
                         alt="Preview" 
+                        width={300}
+                        height={420}
                         className="max-h-80 mx-auto rounded-xl shadow-2xl border-4 border-yellow-400" 
+                        style={{objectFit:'contain', width: 'auto'}}
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent rounded-xl"></div>
                     </div>
@@ -463,10 +484,13 @@ const PokemonCardScanner = () => {
             ) : currentCard && !isCameraActive ? (
               <div className="space-y-4">
                 <div className="relative">
-                  <img 
+                  <Image
                     src={currentCard.image} 
                     alt="Card" 
+                    width={500}
+                    height={700}
                     className="w-full rounded-2xl shadow-2xl border-4 border-yellow-400" 
+                    style={{ width: '100%', height: 'auto'}}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent rounded-2xl"></div>
                 </div>
@@ -586,9 +610,11 @@ const PokemonCardScanner = () => {
               ) : (
                 cards.map((card) => (
                   <div key={card.id} className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-2xl p-4 flex gap-4 hover:shadow-xl transition-all border-4 border-blue-200 hover:border-blue-400 transform hover:scale-[1.02]">
-                    <img 
+                    <Image 
                       src={card.image} 
                       alt={card.nombre} 
+                      width={96}
+                      height={128}
                       className="w-24 h-32 object-cover rounded-xl shadow-lg border-2 border-yellow-400" 
                     />
                     <div className="flex-1 min-w-0">
