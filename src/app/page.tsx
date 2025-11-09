@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Camera, Upload, Trash2, Package, X, AlertCircle, Zap, Star } from 'lucide-react';
 
