@@ -3,60 +3,157 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Camera, Upload, Trash2, Package, X, AlertCircle, Zap, Star } from 'lucide-react';
 
+// ====================================================================
+// PASO 1: EXTENSIÓN DE TIPOS (NECESARIO PARA RESOLVER EL ERROR DE window.storage)
+// Defininimos la interfaz de la API 'storage' que estás utilizando.
+// Reemplaza 'any' por tipos más específicos si conoces la estructura exacta.
+interface CustomStorageApi {
+  list: (prefix: string) => Promise<{ keys: string[] } | null>;
+  get: (key: string) => Promise<{ value: string } | null>;
+  set: (key: string, value: string) => Promise<void>;
+  delete: (key: string) => Promise<void>;
+}
+
+// Extendemos la interfaz global Window para incluir nuestra propiedad 'storage'
+// Esto resuelve el error de compilación.
+declare global {
+  interface Window {
+    storage: CustomStorageApi;
+  }
+}
+// ====================================================================
+
+// Definición de tipos para la carta
+interface CardData {
+    id: string;
+    nombre: string;
+    expansion: string;
+    image: string;
+    trollPrices: string[];
+    trollTypes: string[];
+    tcgPrices: { type: string; price: string }[];
+    timestamp: string;
+    salePrice?: number;
+}
+
+
 const PokemonCardScanner = () => {
-  const [cards, setCards] = useState([]);
-  const [currentCard, setCurrentCard] = useState(null);
+  const [cards, setCards] = useState<CardData[]>([]);
+  const [currentCard, setCurrentCard] = useState<CardData | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [error, setError] = useState(null);
-  const [selectedImage, setSelectedImage] = useState(null);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [manualPrice, setManualPrice] = useState('');
   const [isCameraActive, setIsCameraActive] = useState(false);
-  const [stream, setStream] = useState<MediaStream | null>(null);
   
-  const fileInputRef = useRef(null);
-  const videoRef = useRef(null);
-  const canvasRef = useRef(null);
+  // El tipo MediaStream | null fue corregido en tu última versión, lo mantenemos.
+  const [stream, setStream] = useState<MediaStream | null>(null); 
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  // Tipado correcto para elementos de video y canvas
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Cambia esta URL según donde esté corriendo tu servidor
-  // Si estás en la misma máquina: "http://127.0.0.1:5000/process_image"
-  // Si estás en red local: "http://172.31.87.111:5000/process_image"
-  // Si tienes IP pública: "http://TU_IP_PUBLICA:5000/process_image"
-  const SERVER_URL = "http://127.0.0.1:5000/process_image";
+  // Mantenemos la URL, pero el comentario del error de conexión ya apunta a la IP correcta.
+  const SERVER_URL = "http://127.0.0.1:5000/process_image"; // Usa tu IP pública si despliegas
+
+  // ====================================================================
+  // EFECTOS DE CICLO DE VIDA
+  // ====================================================================
 
   useEffect(() => {
-    loadCards();
+    // Aseguramos que 'window.storage' exista antes de intentar usarlo
+    if (typeof window !== 'undefined' && window.storage) {
+        loadCards();
+    }
+    
+    // Función de limpieza para la cámara (stream)
     return () => {
       if (stream) {
         stream.getTracks().forEach(track => track.stop());
       }
     };
-  }, []);
+  }, [stream]); // Añadimos 'stream' como dependencia para que la función de limpieza funcione correctamente
+
+  // ====================================================================
+  // MANEJO DE ESTADO Y ALMACENAMIENTO (SOLUCIÓN AL ERROR DE window.storage)
+  // ====================================================================
 
   const loadCards = async () => {
+    // Ya no es necesario 'as any' gracias a la declaración de tipos
     try {
       const result = await window.storage.list('card:');
       if (result && result.keys) {
         const cardPromises = result.keys.map(async (key) => {
           const data = await window.storage.get(key);
-          return data ? JSON.parse(data.value) : null;
+          // Aseguramos que data.value exista antes de parsear
+          return data && data.value ? JSON.parse(data.value) as CardData : null;
         });
-        const loadedCards = (await Promise.all(cardPromises)).filter(Boolean);
+        const loadedCards = (await Promise.all(cardPromises)).filter((c): c is CardData => c !== null);
         setCards(loadedCards);
       }
     } catch (err) {
-      console.log('No hay cartas guardadas aún');
+      console.log('No hay cartas guardadas aún o error de storage:', err);
+    }
+  };
+  
+  const saveCard = async () => {
+    if (!currentCard || !manualPrice) {
+      setError('Por favor ingresa el precio de venta');
+      return;
+    }
+
+    try {
+      const salePriceValue = parseFloat(manualPrice);
+      if (isNaN(salePriceValue) || salePriceValue < 0) {
+          setError('Precio de venta inválido');
+          return;
+      }
+      
+      const cardToSave: CardData = {
+        ...currentCard,
+        salePrice: salePriceValue
+      };
+
+      await window.storage.set(`card:${cardToSave.id}`, JSON.stringify(cardToSave));
+      
+      setCards(prev => [cardToSave, ...prev]);
+      resetScanner();
+    } catch (err) {
+      setError('Error al guardar la carta');
+      console.error('Error al guardar:', err);
     }
   };
 
+  const deleteCard = async (cardId: string) => { // Tipado explícito para cardId
+    try {
+      await window.storage.delete(`card:${cardId}`);
+      setCards(prev => prev.filter(c => c.id !== cardId));
+    } catch (err) {
+      console.error('Error al eliminar:', err);
+    }
+  };
+  
+  // ====================================================================
+  // MANEJO DE CÁMARA E IMAGEN
+  // ====================================================================
+
   const openCamera = async () => {
+    // Chequeo de API de navegador (media devices)
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setError('Tu navegador no soporta la API de la cámara.');
+      return;
+    }
+    
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({ 
         video: { facingMode: 'environment' } 
       });
       
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
-        videoRef.current.play();
+      const videoElement = videoRef.current;
+      if (videoElement) {
+        videoElement.srcObject = mediaStream;
+        await videoElement.play(); // Usar await play() para asegurar que comienza
       }
       
       setStream(mediaStream);
@@ -75,18 +172,23 @@ const PokemonCardScanner = () => {
     }
     setIsCameraActive(false);
   };
-
+  
   const capturePhoto = () => {
     if (!videoRef.current || !canvasRef.current) return;
 
     const video = videoRef.current;
     const canvas = canvasRef.current;
+    
+    // Aseguramos que el contexto 2D no sea nulo
     const context = canvas.getContext('2d');
+    if (!context) return; 
 
+    // Ajuste de tamaño para asegurar que la imagen capturada coincida con el video
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
+    // Usamos el callback toBlob correctamente tipado
     canvas.toBlob(async (blob) => {
       if (blob) {
         const imageUrl = URL.createObjectURL(blob);
@@ -97,7 +199,7 @@ const PokemonCardScanner = () => {
     }, 'image/png');
   };
 
-  const handleImageSelect = async (e) => {
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => { // Tipado de evento
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -107,7 +209,7 @@ const PokemonCardScanner = () => {
     await sendImageToServer(file);
   };
 
-  const sendImageToServer = async (imageBlob) => {
+  const sendImageToServer = async (imageBlob: Blob) => { // Tipado de Blob
     setIsProcessing(true);
     setError(null);
 
@@ -127,7 +229,7 @@ const PokemonCardScanner = () => {
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Error del servidor:', errorText);
-        throw new Error(`Error del servidor: ${response.status}`);
+        throw new Error(`Error del servidor: ${response.status} - ${errorText.substring(0, 50)}...`);
       }
 
       const jsonResponse = await response.json();
@@ -135,12 +237,13 @@ const PokemonCardScanner = () => {
       
       processServerResponse(jsonResponse);
     } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Error desconocido de red/servidor';
       console.error('❌ Error completo:', err);
       
-      if (err.name === 'TypeError' && err.message.includes('Failed to fetch')) {
-        setError('No se pudo conectar con el servidor. Verifica que el servidor esté corriendo en http://52.203.146.149:5000');
+      if (errorMessage.includes('Failed to fetch')) {
+        setError(`No se pudo conectar con el servidor. Verifica que el servidor esté corriendo en ${SERVER_URL}`);
       } else {
-        setError(`Error: ${err.message}. Verifica la conexión con el servidor.`);
+        setError(`Error: ${errorMessage}. Verifica la conexión con el servidor.`);
       }
       setSelectedImage(null);
     } finally {
@@ -148,7 +251,7 @@ const PokemonCardScanner = () => {
     }
   };
 
-  const processServerResponse = (response) => {
+  const processServerResponse = (response: any) => { // Usamos 'any' ya que la estructura del servidor es desconocida
     try {
       if (response.error) {
         setError(response.error);
@@ -158,32 +261,32 @@ const PokemonCardScanner = () => {
 
       const nombre = response.nombre || "Nombre no disponible";
       const expansion = response.expansionf || "Expansión no disponible";
-      const cardImageUrl = response.url || selectedImage;
+      const cardImageUrl = response.url || selectedImage || '';
       
-      // Procesar precios de Troll and Toad
       const trollData = response.troll || {};
       const trollCards = trollData.Troll || trollData.cards || [];
-      const trollPrices = [];
-      const trollTypes = [];
+      const trollPrices: string[] = [];
+      const trollTypes: string[] = [];
       
-      trollCards.forEach(troll => {
+      trollCards.forEach((troll: any) => {
         trollPrices.push(troll.price || "N/A");
         trollTypes.push(troll.type || troll.name || "N/A");
       });
 
-      // Procesar precios de TCGPlayer
       const tcgPrices = response.tcg || {};
-      const tcgPricesList = [];
+      const tcgPricesList: { type: string; price: string }[] = [];
       
-      if (typeof tcgPrices === 'object') {
+      if (typeof tcgPrices === 'object' && tcgPrices !== null) {
+        // Usamos Object.entries para iterar sobre pares clave-valor de forma segura
         Object.entries(tcgPrices).forEach(([type, price]) => {
+          // Aseguramos que 'price' sea un string o number para mostrarlo
           if (price && type !== 'error') {
-            tcgPricesList.push({ type, price });
+            tcgPricesList.push({ type, price: String(price) });
           }
         });
       }
 
-      const cardData = {
+      const cardData: CardData = {
         id: Date.now().toString(),
         nombre: nombre,
         expansion: expansion,
@@ -203,35 +306,9 @@ const PokemonCardScanner = () => {
     }
   };
 
-  const saveCard = async () => {
-    if (!currentCard || !manualPrice) {
-      setError('Por favor ingresa el precio de venta');
-      return;
-    }
-
-    try {
-      const cardToSave = {
-        ...currentCard,
-        salePrice: parseFloat(manualPrice)
-      };
-
-      await window.storage.set(`card:${cardToSave.id}`, JSON.stringify(cardToSave));
-      
-      setCards(prev => [cardToSave, ...prev]);
-      resetScanner();
-    } catch (err) {
-      setError('Error al guardar la carta');
-    }
-  };
-
-  const deleteCard = async (cardId) => {
-    try {
-      await window.storage.delete(`card:${cardId}`);
-      setCards(prev => prev.filter(c => c.id !== cardId));
-    } catch (err) {
-      console.error('Error al eliminar:', err);
-    }
-  };
+  // ====================================================================
+  // UTILIDADES Y RENDERIZADO
+  // ====================================================================
 
   const resetScanner = () => {
     setCurrentCard(null);
@@ -241,6 +318,7 @@ const PokemonCardScanner = () => {
     closeCamera();
   };
 
+  // Cálculo de valor total
   const totalValue = cards.reduce((sum, card) => sum + (card.salePrice || 0), 0);
 
   return (
@@ -442,13 +520,13 @@ const PokemonCardScanner = () => {
                   
                   <div className="mt-4 pt-4 border-t-2 border-green-300 space-y-2">
                     <a href={`https://www.tcgplayer.com/search/all/product?q=${encodeURIComponent(currentCard.nombre)}&view=grid`} 
-                       target="_blank" rel="noopener noreferrer" 
-                       className="block text-center bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-xl transition transform hover:scale-105">
+                        target="_blank" rel="noopener noreferrer" 
+                        className="block text-center bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-xl transition transform hover:scale-105">
                       🔗 Ver en TCGPlayer
                     </a>
                     <a href="https://www.trollandtoad.com/" 
-                       target="_blank" rel="noopener noreferrer" 
-                       className="block text-center bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded-xl transition transform hover:scale-105">
+                        target="_blank" rel="noopener noreferrer" 
+                        className="block text-center bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded-xl transition transform hover:scale-105">
                       🔗 Ver en Troll & Toad
                     </a>
                   </div>
