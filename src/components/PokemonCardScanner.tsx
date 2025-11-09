@@ -163,45 +163,67 @@ const PokemonCardScanner = () => {
                 setSelectedImage(null);
                 return;
             }
+        // 1. Extraer la información principal anidada (response.card_info)
+        // Usamos indexación segura, asumiendo que el JSON completo es la 'response' si no está anidado.
+        const cardInfo = (response as any).card_info || response; 
 
-            const nombre = response.nombre || "Nombre no disponible";
-            const expansion = response.expansionf || "Expansión no disponible";
-            const cardImageUrl = response.url || selectedImage || '';
-            
-            // Lógica para Troll & Toad
-            const trollData = response.troll || {};
-            const trollCards = trollData.Troll || trollData.cards || [];
-            const trollPrices: string[] = [];
-            const trollTypes: string[] = [];
-            trollCards.forEach((troll: TrollPrice) => {
-                trollPrices.push(troll.price || "N/A");
-                trollTypes.push(troll.type || troll.name || "N/A");
-            });
+        // 2. Extraer Nombre, Expansión e Imagen de cardInfo
+        const nombre = cardInfo.name || "Nombre no disponible";
+        // La expansión está anidada en set.name
+        const expansion = cardInfo.set?.name || cardInfo.expansionf || "Expansión no disponible";
+        // Usamos la URL 'large' o 'small' si está disponible
+        const cardImageUrl = cardInfo.images?.large || cardInfo.images?.small || selectedImage || ''; 
+        
+        // --- PRECIOS ---
 
-            // Lógica para TCGPlayer
-            const tcgPrices = response.tcg || {};
-            const tcgPricesList: { type: string; price: string }[] = [];
-            if (typeof tcgPrices === 'object' && tcgPrices !== null) {
-                Object.entries(tcgPrices).forEach(([type, price]) => {
-                    if (price && type !== 'error') {
-                        tcgPricesList.push({ type, price: String(price) });
-                    }
-                });
-            }
+        // 3. Lógica para Troll & Toad (Usamos la estructura original si existe, si no, es N/A)
+        const trollData = response.troll || {};
+        const trollCards = trollData.Troll || trollData.cards || [];
+        const trollPrices: string[] = [];
+        const trollTypes: string[] = [];
+        
+        trollCards.forEach((troll: TrollPrice) => {
+            trollPrices.push(troll.price || "N/A");
+            trollTypes.push(troll.type || troll.name || "N/A");
+        });
 
-            const cardData: CardData = {
-                id: Date.now().toString(),
-                nombre: nombre,
-                expansion: expansion,
-                image: cardImageUrl,
-                trollPrices: trollPrices,
-                trollTypes: trollTypes,
-                tcgPrices: tcgPricesList,
-                timestamp: new Date().toISOString()
-            };
+        // 4. Lógica para TCGPlayer (Extrayendo Holofoil y Market Price)
+        const tcgPricesAPI = cardInfo.tcgplayer?.prices || {};
+        const tcgPricesList: { type: string; price: string }[] = [];
 
-            setCurrentCard(cardData);
-            
+        if (tcgPricesAPI.holofoil?.market) {
+             tcgPricesList.push({ 
+                 type: "Holo Market Price", 
+                 price: parseFloat(tcgPricesAPI.holofoil.market).toFixed(2) 
+             });
+        }
+        if (tcgPricesAPI.normal?.market) {
+             tcgPricesList.push({ 
+                 type: "Normal Market Price", 
+                 price: parseFloat(tcgPricesAPI.normal.market).toFixed(2) 
+             });
+        }
+        if (tcgPricesAPI.lowPrice) {
+             tcgPricesList.push({ 
+                 type: "Low Price (CardMarket)", 
+                 price: parseFloat(tcgPricesAPI.lowPrice).toFixed(2) 
+             });
+        }
+        
+        // 5. Crear el objeto CardData
+        const cardData: CardData = {
+            id: Date.now().toString(),
+            nombre: nombre,
+            expansion: expansion,
+            image: cardImageUrl,
+            trollPrices: trollPrices,
+            trollTypes: trollTypes,
+            tcgPrices: tcgPricesList,
+            timestamp: new Date().toISOString()
+        };
+
+        setCurrentCard(cardData);
+        
         } catch (err) {
             setError('Error al procesar la respuesta del servidor');
             console.error('❌ Error procesando respuesta:', err);
@@ -359,6 +381,12 @@ const PokemonCardScanner = () => {
                             <button onClick={() => setCurrentView('settings')} className={`flex items-center gap-2 font-bold transition-all ${currentView === 'settings' ? 'text-yellow-300' : 'text-white hover:text-yellow-300'}`}>
                                 <Settings size={20} /> Configuración
                             </button>
+                            <button
+                                onClick={() => setShowDonateModal(true)}
+                                className="flex items-center gap-2 font-bold text-red-500 hover:text-red-300 transition-all "
+                            >
+                                <Heart size={20} /> Donar
+                                </button>
                         </div>
                         <button className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-bold px-4 py-2 rounded-xl transition-all border-2 border-yellow-400">
                             <LogIn size={20} /> Iniciar Sesión

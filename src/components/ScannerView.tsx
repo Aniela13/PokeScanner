@@ -143,6 +143,7 @@ const ScannerView: React.FC<ScannerViewProps> = ({
                     {!currentCard && !isCameraActive && (
                         <div className="space-y-4">
                             <div className="border-4 border-dashed border-blue-300 rounded-2xl p-8 text-center hover:border-blue-500 transition-all bg-white/10 backdrop-blur-sm">
+                                
                                 {selectedImage && !isProcessing ? (
                                     <div className="relative">
                                         <img src={selectedImage} alt="Preview" className="max-h-80 mx-auto rounded-xl shadow-2xl border-4 border-yellow-400" style={{ objectFit:'contain', width: 'auto'}} />
@@ -247,9 +248,7 @@ const ScannerView: React.FC<ScannerViewProps> = ({
                                     <a href={`https://www.tcgplayer.com/search/all/product?q=${encodeURIComponent(currentCard.nombre)}&view=grid`} target="_blank" rel="noopener noreferrer" className="block text-center bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-xl transition transform hover:scale-105">
                                         🔗 Ver en TCGPlayer
                                     </a>
-                                    <a href="https://www.trollandtoad.com/" target="_blank" rel="noopener noreferrer" className="block text-center bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded-xl transition transform hover:scale-105">
-                                        🔗 Ver en Troll & Toad
-                                    </a>
+                                    
                                 </div>
                             </div>
 
