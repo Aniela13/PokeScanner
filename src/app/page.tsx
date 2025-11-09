@@ -11,7 +11,7 @@ const PokemonCardScanner = () => {
   const [selectedImage, setSelectedImage] = useState(null);
   const [manualPrice, setManualPrice] = useState('');
   const [isCameraActive, setIsCameraActive] = useState(false);
-  const [stream, setStream] = useState(null);
+  const [stream, setStream] = useState<MediaStream | null>(null);
   
   const fileInputRef = useRef(null);
   const videoRef = useRef(null);
