@@ -3,6 +3,7 @@
 Escanea cartas Pokémon con tu cámara, identifícalas vía la API de TCG, consulta su **precio de mercado** y guárdalas en tu **colección** con tu propio precio. Además, desbloquea **logros** según el tamaño de tu colección.
 
 >  **Video demo**: https://youtu.be/DjTDVlcddvs
+
 > **Backend en**: https://github.com/Pozzzo/PokeTCG/tree/main/Codigos
 
 ---
@@ -57,7 +58,7 @@ Escanea cartas Pokémon con tu cámara, identifícalas vía la API de TCG, consu
 
 ---
 
-## 🗺️ Flujo del Frontend
+##  Flujo del Frontend
 **Navegación principal (menú):**
 - **Scanner** (`/scanner`)
   1) Solicita permiso de **cámara**.  
@@ -93,7 +94,7 @@ Cámara → (OCR/inputs) → Query a API TCG → Carta + Precio → Guardar en C
 
 ---
 
-## 📁 Rutas y archivos clave
+##  Rutas y archivos clave
 - `src/app/page.tsx` – Home; enlaces a Scanner/Colección/Perfil.
 - `src/app/scanner/page.tsx` – Vista principal del escáner.
 - `src/app/collection/page.tsx` – Tu colección.
@@ -108,7 +109,7 @@ Cámara → (OCR/inputs) → Query a API TCG → Carta + Precio → Guardar en C
 
 ---
 
-## 📦 Deploy (Vercel)
+##  Deploy (Vercel)
 La forma más sencilla es desplegar en **Vercel**:
 1. Conecta tu repo
 2. Añade las **variables de entorno** de producción
