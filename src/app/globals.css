@@ -274,6 +274,31 @@ body {
         font-size: 2.5em;
     }
 }
+
+@media (max-width: 600px) {
+  .menu-navegacion {
+    /* Si era horizontal, hazla vertical o céntrala */
+    flex-direction: column; 
+    text-align: center;
+    /* Reducir el espaciado interno */
+    padding: 8px; 
+  }
+  
+  /* También puedes reducir el tamaño de los enlaces dentro del menú */
+  .menu-navegacion a {
+    font-size: 1em; 
+    padding: 5px 0;
+  }
+  
+  .header-title {
+    /* Reducir el tamaño de la fuente */
+    font-size: 1.8em; 
+    /* Reducir el padding superior e inferior */
+    padding: 10px 0; 
+    /* Asegurar que no haya márgenes excesivos */
+    margin: 0; 
+  }
+}
 /* @media (prefers-reduced-motion: reduce) {
   .rays-beam { animation: none; opacity: .08; }
 } */
