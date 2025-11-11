@@ -3,6 +3,7 @@
 Escanea cartas Pokémon con tu cámara, identifícalas vía la API de TCG, consulta su **precio de mercado** y guárdalas en tu **colección** con tu propio precio. Además, desbloquea **logros** según el tamaño de tu colección.
 
 >  **Video demo**: https://youtu.be/DjTDVlcddvs
+> **Backend en**: https://github.com/Pozzzo/PokeTCG/tree/main/Codigos
 
 ---
 
